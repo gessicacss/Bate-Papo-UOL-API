@@ -60,9 +60,9 @@ app.post("/messages", async (req, res) => {
   const {user} = req.headers;
 
   const messageSchema = joi.object({
-    to: string().required(),
-    text: string().required(),
-    type: string().required()
+    to: joi.string().required(),
+    text: joi.string().required(),
+    type: joi.string().required()
   })
 
   const validation = messageSchema.validate(req.body);
