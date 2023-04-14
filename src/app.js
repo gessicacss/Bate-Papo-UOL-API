@@ -68,8 +68,26 @@ app.post("/messages", async (req, res) => {
 });
 
 app.get("/messages", async (req, res) => {
+  const {user} = req.headers;
+  const {limit} = req.query;
+
+  const messageType = {
+    $or: [
+      {type: {$ne: 'private_message'}},
+      {type: 'private_message', to: user},
+      {type: 'private_message', from: user}
+    ]
+  };
   try {
-    const messages = await db.collection("messages").find().toArray();
+    if(limit && (isNaN(limit) || limit <= 0)){
+      return res.sendStatus(422);
+    }
+    if(limit){
+      const messages = await db.collection("messages").find(messageType).toArray();
+      const newMessages = messages.slice(-limit)
+      return res.send(newMessages)
+    }
+    const messages = await db.collection("messages").find(messageType).toArray();
     res.send(messages);
   } catch (err) {
     res.status(500).send(err.message);
