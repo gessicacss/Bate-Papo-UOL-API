@@ -31,9 +31,16 @@ app.post("/participants", async (req, res) => {
     type: "status",
     time: formatHour()
   };
+
+  const participantSchema = joi.object({
+    name: joi.string().required(),
+  })
+
+  const validation = participantSchema.validate(req.body);
+
   try {
-    if(!name){
-      return res.status(422).send("'name' is required");
+    if(validation.error){
+      return res.status(422).send(validation.error.details.message);
     }
     const userExist = await db.collection("participants").findOne({ name });
     if (userExist) {
@@ -62,10 +69,10 @@ app.post("/messages", async (req, res) => {
   const messageSchema = joi.object({
     to: joi.string().required(),
     text: joi.string().required(),
-    type: joi.string().required()
+    type: joi.string().valid('private_message', 'message').required()
   })
 
-  const validation = messageSchema.validate(req.body);
+  const validation = messageSchema.validate(req.body, { abortEarly: false });
 
   try {
     if (validation.error){
