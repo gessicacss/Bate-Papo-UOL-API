@@ -3,6 +3,7 @@ import cors from "cors";
 import dotenv from "dotenv";
 import { MongoClient } from "mongodb";
 import formatHour from "./utils/formatHour.js";
+import joi from "joi";
 
 const app = express();
 
@@ -19,6 +20,7 @@ try {
 }
 const db = mongoClient.db();
 
+
 app.post("/participants", async (req, res) => {
   const { name } = req.body;
   const body = { name, lastStatus: Date.now() };
@@ -30,9 +32,12 @@ app.post("/participants", async (req, res) => {
     time: formatHour()
   };
   try {
+    if(!name){
+      return res.status(422).send("'name' is required");
+    }
     const userExist = await db.collection("participants").findOne({ name });
     if (userExist) {
-      return res.status(409).send("Usuário já cadastrado");
+      return res.status(409).send("User already exists on participants list");
     }
     await db.collection("participants").insertOne(body);
     await db.collection("messages").insertOne(messageBody);
@@ -52,15 +57,29 @@ app.get("/participants", async (req, res) => {
 });
 
 app.post("/messages", async (req, res) => {
-  const {to, text, type} = req.body;
   const {user} = req.headers;
+
+  const messageSchema = joi.object({
+    to: string().required(),
+    text: string().required(),
+    type: string().required()
+  })
+
+  const validation = messageSchema.validate(req.body);
+
   try {
+    if (validation.error){
+      const errors = validation.error.details.map((details) => details.message)
+      return res.status(422).send(errors);
+    }
+    
     const isUserOn = await db.collection("participants").findOne({name: user})
+
     if(!isUserOn){
-      return res.sendStatus(422);
+      return res.status(422).send("User isn't on participant list");
     }
     const from = isUserOn.name;
-    await db.collection("messages").insertOne({from, to, text, type, time: formatHour()})
+    await db.collection("messages").insertOne({from, ...req.body, time: formatHour()})
     res.sendStatus(201);
   } catch (err) {
     res.status(500).send(err.message);
@@ -79,7 +98,7 @@ app.get("/messages", async (req, res) => {
     ]
   };
   try {
-    if(limit && (isNaN(limit) || limit <= 0)){
+    if(limit && (isNaN(limit) || parseInt(limit) <= 0)){
       return res.sendStatus(422);
     }
     if(limit){
