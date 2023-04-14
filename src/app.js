@@ -13,15 +13,15 @@ dotenv.config();
 const mongoClient = new MongoClient(process.env.DATABASE_URL);
 try {
   await mongoClient.connect();
-  console.log('MongoDB connected!');
+  console.log("MongoDB connected!");
 } catch (err) {
   console.log(err.message);
 }
 const db = mongoClient.db();
 
 app.post("/participants", async (req, res) => {
-  const {name} = req.body;
-  const body = {name, lastStatus: Date.now()};
+  const { name } = req.body;
+  const body = { name, lastStatus: Date.now() };
   const messageBody = {
     from: name,
     to: "Todos",
@@ -30,12 +30,12 @@ app.post("/participants", async (req, res) => {
     time: formatHour()
   };
   try {
-    const userExist = await db.collection("participants").findOne({name})
+    const userExist = await db.collection("participants").findOne({ name });
     if (userExist) {
-      return res.status(409).send("Usuário já cadastrado")
+      return res.status(409).send("Usuário já cadastrado");
     }
     await db.collection("participants").insertOne(body);
-    await db.collection("messages").insertOne(messageBody)
+    await db.collection("messages").insertOne(messageBody);
     res.sendStatus(201);
   } catch (err) {
     res.status(500).send(err.message);
@@ -47,37 +47,49 @@ app.get("/participants", async (req, res) => {
     const participants = await db.collection("participants").find().toArray();
     res.send(participants);
   } catch (err) {
-    res.status(500).send(err.message)
+    res.status(500).send(err.message);
   }
 });
 
-// app.post("", () => {});
+app.post("/messages", async (req, res) => {
+  const {to, text, type} = req.body;
+  const {user} = req.headers;
+  try {
+    const isUserOn = await db.collection("participants").findOne({name: user})
+    if(!isUserOn){
+      return res.sendStatus(422);
+    }
+    const from = isUserOn.name;
+    await db.collection("messages").insertOne({from, to, text, type, time: formatHour()})
+    res.sendStatus(201);
+  } catch (err) {
+    res.status(500).send(err.message);
+  }
+});
 
 app.get("/messages", async (req, res) => {
   try {
     const messages = await db.collection("messages").find().toArray();
     res.send(messages);
   } catch (err) {
-    res.status(500).send(err.message)
+    res.status(500).send(err.message);
   }
 });
 
 app.post("/status", async (req, res) => {
-  const {user} = req.headers;
+  const { user } = req.headers;
   try {
-    const participant = await db.collection("participants").findOneAndUpdate(
-      {name: user},
-      {$set: {lastStatus: Date.now()}}
-    )
-    if (!participant.value){
+    const participant = await db
+      .collection("participants")
+      .findOneAndUpdate({ name: user }, { $set: { lastStatus: Date.now() } });
+    if (!participant.value) {
       return res.sendStatus(404);
     }
     res.sendStatus(200);
-  } catch (err){
-    res.status(500).send(err.message)
+  } catch (err) {
+    res.status(500).send(err.message);
   }
 });
-
 
 const PORT = 5000;
 app.listen(PORT, () => console.log(`Running on port ${PORT}`));
