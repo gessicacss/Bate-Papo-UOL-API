@@ -1,7 +1,7 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
-import { MongoClient } from "mongodb";
+import { MongoClient, ObjectId } from "mongodb";
 import formatHour from "./utils/formatHour.js";
 import joi from "joi";
 
@@ -72,7 +72,7 @@ app.post("/messages", async (req, res) => {
       const errors = validation.error.details.map((details) => details.message)
       return res.status(422).send(errors);
     }
-    
+
     const isUserOn = await db.collection("participants").findOne({name: user})
 
     if(!isUserOn){
@@ -127,6 +127,30 @@ app.post("/status", async (req, res) => {
     res.status(500).send(err.message);
   }
 });
+
+setInterval(async () => {
+  const lastStatus = 10000;
+  try{
+    const participants = await db.collection("participants").find({lastStatus: {$lt: Date.now() - lastStatus }}).toArray();
+    if(participants.length > 0){
+      for (const offlineUser of participants) {
+        const {_id, name} = offlineUser;
+        await db.collection("participants").deleteOne({_id: new ObjectId(_id)})
+        await db.collection("messages").insertOne({
+          from: name,
+          to: "Todos",
+          text: "sai da sala...",
+          type: "status",
+          time: formatHour()
+        }
+        )
+      }
+    }
+  }
+  catch (err){
+    res.status(500).send(err.message);
+  }
+}, 15000)
 
 const PORT = 5000;
 app.listen(PORT, () => console.log(`Running on port ${PORT}`));
