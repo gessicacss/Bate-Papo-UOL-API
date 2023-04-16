@@ -21,30 +21,29 @@ try {
 }
 const db = mongoClient.db();
 
-
 app.post("/participants", async (req, res) => {
   const { name } = req.body;
 
   const participantSchema = joi.object({
     name: joi.string().trim().required(),
-  })
+  });
 
   const validation = participantSchema.validate(req.body);
 
   try {
-    if(validation.error){
+    if (validation.error) {
       return res.status(422).send(validation.error.message);
     }
     const validName = stripHtml(name).result;
     console.log(validName);
-    console.log(typeof(validName))
+    console.log(typeof validName);
     const body = { name: validName, lastStatus: Date.now() };
     const messageBody = {
       from: validName,
       to: "Todos",
       text: "entra na sala...",
       type: "status",
-      time: formatHour()
+      time: formatHour(),
     };
     const userExist = await db.collection("participants").findOne({ name });
     if (userExist) {
@@ -68,19 +67,19 @@ app.get("/participants", async (req, res) => {
 });
 
 app.post("/messages", async (req, res) => {
-  const {user} = req.headers;
+  const { user } = req.headers;
 
   const messageSchema = joi.object({
     to: joi.string().trim().required(),
     text: joi.string().trim().required(),
-    type: joi.string().valid('private_message', 'message').trim().required()
-  })
+    type: joi.string().valid("private_message", "message").trim().required(),
+  });
 
   const validation = messageSchema.validate(req.body, { abortEarly: false });
 
   try {
-    if (validation.error){
-      const errors = validation.error.details.map((details) => details.message)
+    if (validation.error) {
+      const errors = validation.error.details.map((details) => details.message);
       return res.status(422).send(errors);
     }
 
@@ -88,13 +87,23 @@ app.post("/messages", async (req, res) => {
     const sanitizedTo = stripHtml(to).result;
     const sanitizedText = stripHtml(text).result;
     const sanitizedType = stripHtml(type).result;
-    const isUserOn = await db.collection("participants").findOne({name: user})
+    const isUserOn = await db
+      .collection("participants")
+      .findOne({ name: user });
 
-    if(!isUserOn){
+    if (!isUserOn) {
       return res.status(422).send("User isn't on participant list");
     }
     const from = isUserOn.name;
-    await db.collection("messages").insertOne({from, to: sanitizedTo, text: sanitizedText, type: sanitizedType, time: formatHour()})
+    await db
+      .collection("messages")
+      .insertOne({
+        from,
+        to: sanitizedTo,
+        text: sanitizedText,
+        type: sanitizedType,
+        time: formatHour(),
+      });
     res.sendStatus(201);
   } catch (err) {
     res.status(500).send(err.message);
@@ -102,26 +111,32 @@ app.post("/messages", async (req, res) => {
 });
 
 app.get("/messages", async (req, res) => {
-  const {user} = req.headers;
-  const {limit} = req.query;
+  const { user } = req.headers;
+  const { limit } = req.query;
 
   const messageType = {
     $or: [
-      {type: {$ne: 'private_message'}},
-      {type: 'private_message', to: user},
-      {type: 'private_message', from: user}
-    ]
+      { type: { $ne: "private_message" } },
+      { type: "private_message", to: user },
+      { type: "private_message", from: user },
+    ],
   };
   try {
-    if(limit && (isNaN(limit) || parseInt(limit) <= 0)){
+    if (limit && (isNaN(limit) || parseInt(limit) <= 0)) {
       return res.sendStatus(422);
     }
-    if(limit){
-      const messages = await db.collection("messages").find(messageType).toArray();
-      const newMessages = messages.slice(-limit)
-      return res.send(newMessages)
+    if (limit) {
+      const messages = await db
+        .collection("messages")
+        .find(messageType)
+        .toArray();
+      const newMessages = messages.slice(-limit);
+      return res.send(newMessages);
     }
-    const messages = await db.collection("messages").find(messageType).toArray();
+    const messages = await db
+      .collection("messages")
+      .find(messageType)
+      .toArray();
     res.send(messages);
   } catch (err) {
     res.status(500).send(err.message);
@@ -129,20 +144,20 @@ app.get("/messages", async (req, res) => {
 });
 
 app.put("/messages/:id", async (req, res) => {
-  const {user} = req.headers;
-  const {id} = req.params;
+  const { user } = req.headers;
+  const { id } = req.params;
 
   const messageSchema = joi.object({
     to: joi.string().trim().required(),
     text: joi.string().trim().required(),
-    type: joi.string().valid('private_message', 'message').trim().required()
-  })
+    type: joi.string().valid("private_message", "message").trim().required(),
+  });
 
   const validation = messageSchema.validate(req.body, { abortEarly: false });
-  
+
   try {
-    if (validation.error){
-      const errors = validation.error.details.map((details) => details.message)
+    if (validation.error) {
+      const errors = validation.error.details.map((details) => details.message);
       return res.status(422).send(errors);
     }
 
@@ -155,25 +170,51 @@ app.put("/messages/:id", async (req, res) => {
       to: sanitizedTo,
       text: sanitizedText,
       type: sanitizedType,
-      time: formatHour()
-    }
+      time: formatHour(),
+    };
 
-    const editMessage = await db.collection("messages").findOne({_id: new ObjectId(id)})
+    const editMessage = await db
+      .collection("messages")
+      .findOne({ _id: new ObjectId(id) });
 
-    if(!editMessage){
+    if (!editMessage) {
       return res.status(404).send("There's no message with this id!");
     }
-    if (editMessage.from !== user){
-      return res.status(401).send("You don't have permission to edit this message.");
+    if (editMessage.from !== user) {
+      return res
+        .status(401)
+        .send("You don't have permission to edit this message.");
     }
     await db
-    .collection("messages")
-    .updateOne({ _id: new ObjectId(id) }, { $set: editedMessage});
+      .collection("messages")
+      .updateOne({ _id: new ObjectId(id) }, { $set: editedMessage });
     res.sendStatus(201);
   } catch (err) {
     res.status(500).send(err.message);
   }
-})
+});
+
+app.delete("/messages/:id", async (req, res) => {
+  const { user } = req.headers;
+  const { id } = req.params;
+  try {
+    const message = await db
+      .collection("messages")
+      .findOne({ _id: new ObjectId(id) });
+    if (!message) {
+      return res.status(404).send("There's no message with this id!");
+    }
+    if (message.from !== user) {
+      return res
+        .status(401)
+        .send("You don't have permission to delete this message.");
+    }
+    await db.collection("messages").deleteOne({ _id: new ObjectId(id) });
+    res.sendStatus(204);
+  } catch (err) {
+    res.status(500).send(err.message);
+  }
+});
 
 app.post("/status", async (req, res) => {
   const { user } = req.headers;
@@ -192,27 +233,30 @@ app.post("/status", async (req, res) => {
 
 setInterval(async () => {
   const lastStatus = 10000;
-  try{
-    const participants = await db.collection("participants").find({lastStatus: {$lt: Date.now() - lastStatus }}).toArray();
-    if(participants.length > 0){
+  try {
+    const participants = await db
+      .collection("participants")
+      .find({ lastStatus: { $lt: Date.now() - lastStatus } })
+      .toArray();
+    if (participants.length > 0) {
       for (const offlineUser of participants) {
-        const {_id, name} = offlineUser;
-        await db.collection("participants").deleteOne({_id: new ObjectId(_id)})
+        const { _id, name } = offlineUser;
+        await db
+          .collection("participants")
+          .deleteOne({ _id: new ObjectId(_id) });
         await db.collection("messages").insertOne({
           from: name,
           to: "Todos",
           text: "sai da sala...",
           type: "status",
-          time: formatHour()
-        }
-        )
+          time: formatHour(),
+        });
       }
     }
-  }
-  catch (err){
+  } catch (err) {
     res.status(500).send(err.message);
   }
-}, 15000)
+}, 15000);
 
 const PORT = 5000;
 app.listen(PORT, () => console.log(`Running on port ${PORT}`));
