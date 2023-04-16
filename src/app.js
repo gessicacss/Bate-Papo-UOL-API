@@ -24,29 +24,28 @@ const db = mongoClient.db();
 
 app.post("/participants", async (req, res) => {
   const { name } = req.body;
-  const validName = stripHtml(name).result;
-  const body = { name: validName, lastStatus: Date.now() };
-  const messageBody = {
-    from: validName,
-    to: "Todos",
-    text: "entra na sala...",
-    type: "status",
-    time: formatHour()
-  };
 
   const participantSchema = joi.object({
     name: joi.string().trim().required(),
   })
 
-  console.log(validName);
-  console.log(typeof(validName))
-
-  const validation = participantSchema.validate({name: validName});
+  const validation = participantSchema.validate(req.body);
 
   try {
     if(validation.error){
       return res.status(422).send(validation.error.message);
     }
+    const validName = stripHtml(name).result;
+    console.log(validName);
+    console.log(typeof(validName))
+    const body = { name: validName, lastStatus: Date.now() };
+    const messageBody = {
+      from: validName,
+      to: "Todos",
+      text: "entra na sala...",
+      type: "status",
+      time: formatHour()
+    };
     const userExist = await db.collection("participants").findOne({ name });
     if (userExist) {
       return res.status(409).send("User already exists on participants list");
@@ -70,10 +69,6 @@ app.get("/participants", async (req, res) => {
 
 app.post("/messages", async (req, res) => {
   const {user} = req.headers;
-  const { to, text, type } = req.body;
-  const sanitizedTo = stripHtml(to).result;
-  const sanitizedText = stripHtml(text).result;
-  const sanitizedType = stripHtml(type).result;
 
   const messageSchema = joi.object({
     to: joi.string().trim().required(),
@@ -81,7 +76,7 @@ app.post("/messages", async (req, res) => {
     type: joi.string().valid('private_message', 'message').trim().required()
   })
 
-  const validation = messageSchema.validate({to: sanitizedTo, text: sanitizedText, type: sanitizedType}, { abortEarly: false });
+  const validation = messageSchema.validate(req.body, { abortEarly: false });
 
   try {
     if (validation.error){
@@ -89,6 +84,10 @@ app.post("/messages", async (req, res) => {
       return res.status(422).send(errors);
     }
 
+    const { to, text, type } = req.body;
+    const sanitizedTo = stripHtml(to).result;
+    const sanitizedText = stripHtml(text).result;
+    const sanitizedType = stripHtml(type).result;
     const isUserOn = await db.collection("participants").findOne({name: user})
 
     if(!isUserOn){
@@ -128,6 +127,53 @@ app.get("/messages", async (req, res) => {
     res.status(500).send(err.message);
   }
 });
+
+app.put("/messages/:id", async (req, res) => {
+  const {user} = req.headers;
+  const {id} = req.params;
+
+  const messageSchema = joi.object({
+    to: joi.string().trim().required(),
+    text: joi.string().trim().required(),
+    type: joi.string().valid('private_message', 'message').trim().required()
+  })
+
+  const validation = messageSchema.validate(req.body, { abortEarly: false });
+  
+  try {
+    if (validation.error){
+      const errors = validation.error.details.map((details) => details.message)
+      return res.status(422).send(errors);
+    }
+
+    const { to, text, type } = req.body;
+    const sanitizedTo = stripHtml(to).result;
+    const sanitizedText = stripHtml(text).result;
+    const sanitizedType = stripHtml(type).result;
+    const editedMessage = {
+      from: user,
+      to: sanitizedTo,
+      text: sanitizedText,
+      type: sanitizedType,
+      time: formatHour()
+    }
+
+    const editMessage = await db.collection("messages").findOne({_id: new ObjectId(id)})
+
+    if(!editMessage){
+      return res.status(404).send("There's no message with this id!");
+    }
+    if (editMessage.from !== user){
+      return res.status(401).send("You don't have permission to edit this message.");
+    }
+    await db
+    .collection("messages")
+    .updateOne({ _id: new ObjectId(id) }, { $set: editedMessage});
+    res.sendStatus(201);
+  } catch (err) {
+    res.status(500).send(err.message);
+  }
+})
 
 app.post("/status", async (req, res) => {
   const { user } = req.headers;
