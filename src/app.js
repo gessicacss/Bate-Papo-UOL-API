@@ -188,7 +188,7 @@ app.put("/messages/:id", async (req, res) => {
     await db
       .collection("messages")
       .updateOne({ _id: new ObjectId(id) }, { $set: editedMessage });
-    res.sendStatus(201);
+    res.sendStatus(200);
   } catch (err) {
     res.status(500).send(err.message);
   }
@@ -210,7 +210,7 @@ app.delete("/messages/:id", async (req, res) => {
         .send("You don't have permission to delete this message.");
     }
     await db.collection("messages").deleteOne({ _id: new ObjectId(id) });
-    res.sendStatus(204);
+    res.sendStatus(200);
   } catch (err) {
     res.status(500).send(err.message);
   }
