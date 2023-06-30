@@ -121,4 +121,4 @@ DATABASE_URL=mongodb://localhost:27017/batePapoUol
 npm start
 ```
 
-4. Access http://localhost:5000 on your browser to run the API.
+5. Access http://localhost:5000 on your browser to run the API.
