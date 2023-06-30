@@ -1,4 +1,4 @@
-# BATE-PAPO UOL API
+# CHAT API
 
 ## About
 
